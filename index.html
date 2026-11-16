@@ -1,0 +1,228 @@
+<!doctype html>
+<html lang="en-AU"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Club Manager Dashboard</title>
+<style>
+:root{color-scheme:dark;--pri:#d62f3a;--bg:#0b0b0d;--card:#151518;--ln:#2c2c32;--tx:#e9e9ec;--mute:#9b9ba4;--ok:#4cc38a;--bad:#ff5a64}
+*{box-sizing:border-box}body{margin:0;font:14px/1.45 "Segoe UI",system-ui,sans-serif;background:var(--bg);color:var(--tx)}
+header{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;padding:12px 18px;background:#000;color:#fff;border-bottom:3px solid var(--pri)}
+header h1{font-size:18px;margin:0}header .t{display:flex;gap:8px;align-items:center;flex-wrap:wrap}#saved{font-size:12px;color:var(--mute)}
+nav{display:flex;gap:4px;flex-wrap:wrap;padding:8px 18px 0}nav.c{padding-top:8px}
+button,.btn{font:inherit;border:1px solid var(--ln);background:#222227;color:var(--tx);border-radius:6px;padding:5px 11px;cursor:pointer}
+header button,header .btn{background:#222227;color:#fff;border-color:#44444c}button:hover,.btn:hover{border-color:var(--pri)}
+nav button.on{background:var(--pri);color:#fff;border-color:var(--pri)}
+main{padding:14px 18px 40px}.card{background:var(--card);border:1px solid var(--ln);border-radius:8px;padding:12px;margin-bottom:14px;overflow-x:auto}
+.bar{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap}h2{font-size:16px;margin:0 0 8px}
+table{border-collapse:collapse;width:100%}th,td{border:1px solid var(--ln);padding:3px 6px;text-align:center;white-space:nowrap}th{background:#222227;color:var(--mute);font-weight:600}
+td.l,th.l{text-align:left}.sticky{position:sticky;left:0;background:var(--card);z-index:1}
+input,select,textarea{font:inherit;color:var(--tx);background:transparent;border:1px solid var(--ln);border-radius:4px;padding:3px 5px}
+td input{width:54px;text-align:center}td input.w{width:100%;text-align:left;min-width:160px}input.cfg{width:70px}
+textarea{width:100%;min-height:340px;resize:vertical}.g3{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px}
+.cfgs{display:flex;flex-wrap:wrap;gap:12px}.cfgs label{display:flex;flex-direction:column;font-size:12px}
+.ok{color:var(--ok);font-weight:600}.bad{color:var(--bad);font-weight:600}.tot{font-weight:700;background:#d62f3a1f}.note{font-size:12px;color:var(--mute)}
+@media print{header,nav,.bar button,.noprint{display:none}body{background:#fff;color:#000}}
+</style></head><body>
+<header><h1>Club Manager Dashboard</h1><div class="t"><input type="month" id="month"><span id="saved"></span>
+<button data-a="exp">Export backup</button><label class="btn">Import<input type="file" id="imp" hidden accept=".json"></label></div></header>
+<nav id="nav"></nav><nav id="clubs" class="c"></nav><main id="main"></main>
+<script>
+const KEY='clubdash.v1',$=s=>document.querySelector(s);
+const MET=[['leavers','Leavers'],['prospects','Prospects'],['calls','Calls'],['appts','Appointments'],['shows','Shows'],['sales','Sales']];
+const CFG=[['leavers','Leavers target',50],['growth','Growth target',5],['lts','Lead to sale %',25],['cta','Call to appointment %',33],['show','Appointment show %',80],['sts','Show to sale %',80]];
+const DEF=Object.fromEntries(CFG.map(c=>[c[0],c[2]]));
+const ROWS=['Member number','Leavers','Attrition %','Membership sales','NMM','New member yield','Current DD yield','DD income','Membership income','Turnover','Arrears amount','Arrears %'];
+const SUMR=[0,1,3,4,7,8,9,10];
+const MONTHS=Array.from({length:12},(_,i)=>{const d=new Date(2026,10+i,1);return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')});
+const SECS=[['overview','Group overview'],['tracker','Sales tracker'],['kpi','KPIs & budget'],['sched','Daily schedule'],['roles','Club roles'],['jd','Job description']];
+const DEFJD=`Anytime Fitness {club} - Club Manager Role
+
+Our aim at Anytime Fitness {club} is to deliver the best possible member experience with a motivated Club Manager to drive the club and team.
+
+Skills required
+- Fun, energetic, and gains energy from engaging with people
+- Confident promoting the club internally and externally
+- Strong administrative and organisational skills, comfortable making calls
+- Excellent customer service
+- Comfortable with content creation and appearing on camera
+- Sociable, confident, enjoys building relationships
+- Self-starter with initiative
+- Able to work in a team and lead from the front
+
+The role
+Ensure smooth and efficient club operations while maximising sales performance:
+- Driving sales through call drives, walk-ins, and strategic promotions
+- Leading, motivating, and developing your team
+- Delivering exceptional service and fostering strong member relationships
+
+What's in it for you
+- Competitive base salary + super + bonuses
+- Ongoing training, development, and support
+- A genuine, rewarding, fun, and social work environment
+- Monday to Thursday roster with a 3 day weekend, no weekends or public holidays
+
+Requirements
+Customer service experience in fitness, retail/hospitality or similar is desirable. Proficiency with computers and social media is required. Working with children check, first aid, police check and driver's licence are required.`;
+const DEFROLES={cm:`Handle member complaints and forward to Area Manager
+Oversee daily running and operations of gym
+Hourly gym floor cleans
+Ensure leads are contacted within 10 mins of initial enquiry
+Ensure vending is stocked
+Ensure club stock and cleaning stock is maintained
+Oversee cleaning and report to Area Manager
+Schedule CRMs according to calendar provided by Area Manager
+Ensure social media content is filmed and posted on time per Area Manager calendar
+EOD/EOW reports
+Banking: cash bagged and handed to Area Manager monthly
+Use telephone enquiry for every call
+Report club issues to Area Manager (maintenance, facility etc)
+Forward invoices to Area Manager
+Oversee daily outreach/prospecting
+Onboard new members
+Reply to club emails within 24 hours
+Forward emails to Area Manager where required
+Ensure every prospect or walk-in completes a guest profile and gets a guided/FAB tour related to their goals
+Daily set-up meets with tasks for club staff
+Weekly meets with Area Manager to go over where the club is at
+Understand sales stats: leads, appointments and sales needed each month/week/day
+Create monthly outreach plans with Area Manager
+Compliance checks, monthly safety checks, AED, first aid etc
+Member retention
+Push for member referrals`,mc:`Complete daily call drives
+Hourly gym floor cleans
+Assist club manager
+Handle member complaints and forward to club manager
+Ensure leads are contacted within 10 mins of initial enquiry
+Use telephone enquiry for every call
+Complete daily outreach/prospecting
+Onboard new members
+Ensure every prospect or walk-in completes a guest profile and gets a guided/FAB tour
+Understand sales stats: leads, appointments and sales needed each month/week/day
+Daily meets with CM to plan the day
+Member retention
+Follow up non-joiners
+Ensure prospects with no future end date are scheduled a task or blown out
+Confirm appointments
+Push for member referrals`,pt:`Consult with members
+Offer personal training services
+Gym floor cleans
+Assist club staff
+Maintain active fitness registration, insurance, ABN, first aid and CPR
+Pay weekly gym rent on time
+Film social content for PT page
+Assist club staff with social media videos
+Handle member complaints and forward to club manager
+Onboard new members
+Provide 30 minute onboarding sessions to new members
+Provide 1:1 personal training services
+Ensure all clients have programs, sessions and check-ins on time
+Let club manager know of any issues
+Member retention
+Maintain client records`};
+const DEFSCHED=[
+['10:00','Club clean and office setup (POS etc.)','Walkthrough check: toilets, showers, vending, lights, equipment faults','all'],
+['10:30','Daily huddle (CM + MC, 10 mins), then admin tasks',"Cover yesterday's results, today's goals, schedule, appointments, targets",'all'],
+['10:45','Check emails, phones and socials','Reply to club emails within 24 hrs','all'],
+['11:00','Morning call drive','','all'],
+['11:30','Admin tasks','Lead follow-ups, CRM updates','all'],
+['11:30','ARREARS BLOCK (Wednesdays)','Work the arrears list: call/SMS members in arrears, update CRM notes, send arrears total in EOD sheet','wed'],
+['12:00','Gym floor clean and talk to members','Hourly floor clean','all'],
+['12:30','Floor presence, member check-ins','Retention SMSs, onboarding','all'],
+['13:00','Lunch','Stagger so someone is always on the desk','all'],
+['13:30','Outreach/prospecting','','all'],
+['14:00','Outreach/prospecting','','all'],
+['14:30','Film and post social media','','all'],
+['15:00','Gym floor clean and talk to members','Hourly floor clean','all'],
+['15:30','Appointments, tours, consults and new member onboarding','Booked prospects and walk-ins','all'],
+['16:00','Lead and follow-up block','No-shows, confirmations, unconverted prospects, expired trials, cancellations and win-backs, post social content','all'],
+['16:30','Prep for evening drive and CM check-in',"Review the day's numbers against target, plan for evening calls",'all'],
+['16:30','MONTHLY TRANSFERS','Bag banking cash, forward invoices, complete and send monthly transfers to Area Manager','monthly'],
+['17:00','Evening call drive','','all'],
+['17:30','Gym floor clean, toilets and cleaning stock check, then EOD/EOW sheet','','all'],
+['18:00','Home time!','','all']];
+let S=load();
+const ui={sec:'overview',c:S.clubs[0].id,m:new Date().toISOString().slice(0,7),day:['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][new Date().getDay()],xfer:false,kt:'a'};
+function load(){try{const s=JSON.parse(localStorage[KEY]);if(s&&s.clubs)return s}catch{}
+return{clubs:[{id:'tamworth',name:'Tamworth'},{id:'singleton',name:'Singleton'}],d:{},roles:DEFROLES,sched:DEFSCHED}}
+function save(){try{localStorage[KEY]=JSON.stringify(S);$('#saved').textContent='Saved '+new Date().toLocaleTimeString('en-AU',{hour:'2-digit',minute:'2-digit'})}catch{$('#saved').textContent='Could not save'}}
+function get(p,d){let o=S;for(const k of p.split('|'))o=o?.[k];return o??d}
+function set(p,v){let o=S;const a=p.split('|');a.slice(0,-1).forEach(k=>o=o[k]??={});o[a.at(-1)]=v;save()}
+const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const dim=m=>{const[y,mo]=m.split('-');return new Date(y,mo,0).getDate()};
+const cn=id=>S.clubs.find(c=>c.id==id)?.name||id;
+const mlabel=m=>new Date(m+'-01T00:00').toLocaleString('en-AU',{month:'short',year:'2-digit'});
+const num=(p,cls='')=>`<input data-p="${p}" type="number" min="0" step="any" value="${esc(get(p,''))}" class="${cls}">`;
+function totals(c,m){const n=dim(m),o={};for(const[k]of MET)for(const w of['t','a']){let s=0;for(let i=0;i<n;i++)s+=+get(`d|${c}|tr|${m}|${k}|${w}|${i}`,0)||0;o[k+w]=s}
+o.nt=o.salest-o.leaverst;o.na=o.salesa-o.leaversa;return o}
+const cfg=(c,m,k)=>+get(`d|${c}|tr|${m}|cfg|${k}`,DEF[k]);
+function req(c,m){const S_=cfg(c,m,'leavers')+cfg(c,m,'growth');return{sales:S_,prospects:S_/(cfg(c,m,'lts')/100||1),calls:S_/(cfg(c,m,'cta')/100||1),appts:S_/(cfg(c,m,'sts')/100||1)}}
+const r1=v=>Number.isFinite(v)?Math.round(v*10)/10:0;
+function render(){
+$('#month').value=ui.m;
+$('#nav').innerHTML=SECS.map(s=>`<button data-a="sec" data-v="${s[0]}" class="${ui.sec==s[0]?'on':''}">${s[1]}</button>`).join('');
+$('#clubs').innerHTML=['tracker','kpi','jd'].includes(ui.sec)?S.clubs.map(c=>`<button data-a="club" data-v="${c.id}" class="${ui.c==c.id?'on':''}">${esc(c.name)}</button>`).join('')+'<button data-a="addclub">+ Add club</button>':'';
+$('#main').innerHTML=({overview,tracker,kpi,sched,roles,jd})[ui.sec]();
+if(ui.sec=='tracker')calc()}
+function tracker(){const{c,m}=ui,n=dim(m),P=`d|${c}|tr|${m}|`;
+let h=`<div class="card"><div class="bar"><h2>${esc(cn(c))} sales tracker, ${mlabel(m)}</h2><button data-a="af">Auto-fill daily targets</button></div><div class="cfgs">`+
+CFG.map(([k,l])=>`<label>${l}<input class="cfg" type="number" min="0" data-p="${P}cfg|${k}" value="${cfg(c,m,k)}"></label>`).join('')+`</div></div>
+<div class="g3"><div class="card"><h2>Targets vs actuals</h2><table><tr><th class="l"></th><th>Required</th><th>Daily targets total</th><th>Actual</th></tr>`+
+[['sales','Sales'],['prospects','Prospects'],['calls','Calls'],['appts','Appointments']].map(([k,l])=>`<tr><td class="l">${l}</td><td id="rq-${k}"></td><td id="tt-${k}"></td><td id="ta-${k}" class="tot"></td></tr>`).join('')+
+`<tr><td class="l">Leavers</td><td id="rq-leavers"></td><td id="tt-leavers"></td><td id="ta-leavers" class="tot"></td></tr><tr><td class="l">NMM</td><td></td><td id="tt-nmm"></td><td id="ta-nmm" class="tot"></td></tr></table></div>
+<div class="card"><h2>Current sales stats</h2><table><tr><th class="l"></th><th>Goal</th><th>Actual</th></tr>`+
+[['lts','Lead to sale'],['cta','Call to appointment'],['show','Appointment show'],['sts','Show to sale']].map(([k,l])=>`<tr><td class="l">${l}</td><td>${cfg(c,m,k)}%</td><td id="r-${k}" class="tot"></td></tr>`).join('')+`</table></div></div>
+<div class="card"><h2>Daily numbers</h2><table><tr><th class="l sticky">Date</th>`;
+const[y,mo]=m.split('-');
+for(let i=0;i<n;i++)h+=`<th>${i+1}<br><span class="note">${['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][new Date(y,mo-1,i+1).getDay()]}</span></th>`;
+h+='<th>Total</th></tr>';
+for(const[k,l]of MET)for(const w of['t','a']){if(k=='shows'&&w=='t')continue;
+h+=`<tr><td class="l sticky">${l} ${w=='t'?'target':'actual'}</td>`;for(let i=0;i<n;i++)h+=`<td>${num(`${P}${k}|${w}|${i}`)}</td>`;h+=`<td class="tot" id="s-${k}${w}"></td></tr>`}
+for(const w of['t','a']){h+=`<tr><td class="l sticky">NMM ${w=='t'?'target':'actual'}</td>`;for(let i=0;i<n;i++)h+=`<td id="n-${w}${i}"></td>`;h+=`<td class="tot" id="s-n${w}"></td></tr>`}
+return h+'</table></div>'}
+function calc(){const{c,m}=ui,n=dim(m),T=totals(c,m),R=req(c,m),x=(id,v)=>{const e=document.getElementById(id);if(e)e.textContent=v};
+for(const[k]of MET)for(const w of['t','a'])x(`s-${k}${w}`,T[k+w]);
+x('s-nt',T.nt);x('s-na',T.na);
+for(let i=0;i<n;i++)for(const w of['t','a']){const g=k=>+get(`d|${c}|tr|${m}|${k}|${w}|${i}`,0)||0;x(`n-${w}${i}`,g('sales')-g('leavers'))}
+for(const k of['sales','prospects','calls','appts']){x('rq-'+k,r1(R[k]));x('tt-'+k,T[k+'t']);x('ta-'+k,T[k+'a'])}
+x('rq-leavers',cfg(c,m,'leavers'));x('tt-leavers',T.leaverst);x('ta-leavers',T.leaversa);x('tt-nmm',T.nt);x('ta-nmm',T.na);
+const p=(a,b)=>b?Math.round(a/b*100)+'%':'-';
+x('r-lts',p(T.salesa,T.prospectsa));x('r-cta',p(T.apptsa,T.callsa));x('r-show',p(T.showsa,T.apptsa));x('r-sts',p(T.salesa,T.showsa))}
+function autofill(){const{c,m}=ui,n=dim(m),R=req(c,m),tot={leavers:cfg(c,m,'leavers'),prospects:R.prospects,calls:R.calls,appts:R.appts,sales:R.sales};
+for(const k in tot){const t=Math.ceil(tot[k]),b=Math.floor(t/n),rem=t%n;for(let i=0;i<n;i++)set(`d|${c}|tr|${m}|${k}|t|${i}`,b+(i<rem?1:0))}render()}
+function kpi(){const c=ui.c,t=ui.kt;
+let h=`<div class="card"><div class="bar"><h2>${esc(cn(c))} KPIs & budget (${t=='a'?'actuals':'targets'})</h2><span><button data-a="kt" data-v="t" class="${t=='t'?'on':''}">Targets</button> <button data-a="kt" data-v="a" class="${t=='a'?'on':''}">Actuals</button></span></div><table><tr><th class="l sticky">Metric</th>`+MONTHS.map(m=>`<th>${mlabel(m)}</th>`).join('')+'</tr>';
+ROWS.forEach((r,i)=>{h+=`<tr><td class="l sticky">${r}</td>`+MONTHS.map(m=>`<td>${num(`d|${c}|kp|${t}|${i}|${m}`)}</td>`).join('')+'</tr>'});
+return h+'</table></div>'}
+function overview(){const m=ui.m,cl=S.clubs,cell=(a,t,low)=>{const good=t?(low?a<=t:a>=t):null;return`<td class="${good===null?'':good?'ok':'bad'}">${r1(a)} / ${r1(t)}</td>`};
+const ks=[['sales','Sales'],['leavers','Leavers'],['n','NMM'],['prospects','Prospects'],['calls','Calls'],['appts','Appointments']];
+let h=`<div class="card"><h2>Sales tracker, ${mlabel(m)} (actual / target)</h2><table><tr><th class="l">Club</th>${ks.map(k=>`<th>${k[1]}</th>`).join('')}</tr>`;
+const G={};
+for(const c of cl){const T=totals(c.id,m);h+=`<tr><td class="l">${esc(c.name)}</td>`+ks.map(([k])=>{const a=T[k+'a'],t=T[k+'t'];G[k+'a']=(G[k+'a']||0)+a;G[k+'t']=(G[k+'t']||0)+t;return cell(a,t,k=='leavers')}).join('')+'</tr>'}
+h+=`<tr class="tot"><td class="l">Group</td>`+ks.map(([k])=>cell(G[k+'a']||0,G[k+'t']||0,k=='leavers')).join('')+'</tr></table></div>';
+h+=`<div class="card"><h2>KPIs & budget, ${mlabel(m)}</h2><table><tr><th class="l">Metric</th>${cl.map(c=>`<th>${esc(c.name)}</th>`).join('')}<th>Group actual</th><th>Group target</th></tr>`;
+const g=(c,t,r)=>+get(`d|${c}|kp|${t}|${r}|${m}`,0)||0;
+for(const r of SUMR){const a=cl.map(c=>g(c.id,'a',r));h+=`<tr><td class="l">${ROWS[r]}</td>${a.map(v=>`<td>${v}</td>`).join('')}<td class="tot">${r1(a.reduce((x,y)=>x+y,0))}</td><td>${r1(cl.reduce((s,c)=>s+g(c.id,'t',r),0))}</td></tr>`}
+const mem=cl.reduce((s,c)=>s+g(c.id,'a',0),0),lv=cl.reduce((s,c)=>s+g(c.id,'a',1),0);
+return h+`<tr><td class="l">Attrition % (leavers / members)</td>${cl.map(c=>{const a=g(c.id,'a',0);return`<td>${a?r1(g(c.id,'a',1)/a*100)+'%':'-'}</td>`}).join('')}<td class="tot">${mem?r1(lv/mem*100)+'%':'-'}</td><td></td></tr></table><p class="note">Percent and yield KPIs are per club on the KPIs tab. Group rows add the clubs together.</p></div>`}
+function sched(){const rows=S.sched.map((r,i)=>[r,i]).filter(([r])=>r[3]=='all'||(r[3]=='wed'&&ui.day=='Wed')||(r[3]=='monthly'&&ui.xfer));
+return`<div class="card"><div class="bar"><h2>Daily schedule (all clubs)</h2><span class="noprint">${['Mon','Tue','Wed','Thu','Fri'].map(d=>`<button data-a="day" data-v="${d}" class="${ui.day==d?'on':''}">${d}</button>`).join(' ')} <label><input type="checkbox" data-a="xfer" ${ui.xfer?'checked':''}> Monthly transfer day</label> <button data-a="print">Print</button></span></div>
+<table><tr><th>Time</th><th class="l">Task</th><th class="l">Notes</th><th class="noprint">Shows on</th><th class="noprint"></th></tr>`+
+rows.map(([r,i])=>`<tr><td><input style="width:64px" data-p="sched|${i}|0" value="${esc(r[0])}"></td><td><input class="w" data-p="sched|${i}|1" value="${esc(r[1])}"></td><td><input class="w" data-p="sched|${i}|2" value="${esc(r[2])}"></td><td class="noprint"><select data-p="sched|${i}|3">${[['all','Every day'],['wed','Wednesday'],['monthly','Monthly']].map(o=>`<option value="${o[0]}" ${r[3]==o[0]?'selected':''}>${o[1]}</option>`).join('')}</select></td><td class="noprint"><button data-a="delrow" data-v="${i}">Remove</button></td></tr>`).join('')+
+`</table><p class="noprint"><button data-a="addrow">+ Add task</button> <button data-a="sortrows">Sort by time</button></p><p class="note noprint">Changes apply to every club. Wednesday shows the arrears block; tick "Monthly transfer day" to show the transfers task.</p></div>`}
+function roles(){const L={cm:'Club Manager',mc:'Membership Consultant',pt:'Personal Trainer'};
+return`<div class="g3">`+Object.keys(L).map(k=>`<div class="card"><h2>${L[k]}</h2><textarea data-p="roles|${k}">${esc(get('roles|'+k,''))}</textarea></div>`).join('')+`</div><p class="note">One expectation per line. Applies to all clubs.</p>`}
+function jd(){const c=ui.c,p=`d|${c}|jd`;return`<div class="card"><div class="bar"><h2>${esc(cn(c))} job description</h2><button data-a="print">Print</button></div><textarea data-p="${p}" style="min-height:560px">${esc(get(p,DEFJD.replaceAll('{club}',cn(c))))}</textarea></div>`}
+document.addEventListener('input',e=>{const t=e.target;if(!t.dataset.p)return;set(t.dataset.p,t.type=='number'?(t.value===''?'':+t.value):t.value);if(ui.sec=='tracker')calc()});
+document.addEventListener('change',e=>{const t=e.target;if(t.dataset.a=='xfer'){ui.xfer=t.checked;render()}else if(t.dataset.p&&t.tagName=='SELECT')render()});
+document.addEventListener('click',e=>{const b=e.target.closest('button[data-a]');if(!b)return;const a=b.dataset.a,v=b.dataset.v;
+if(a=='sec')ui.sec=v;else if(a=='club')ui.c=v;else if(a=='day')ui.day=v;else if(a=='kt')ui.kt=v;
+else if(a=='af'){autofill();return}
+else if(a=='print'){print();return}
+else if(a=='addclub'){const n=prompt('Club name');if(!n)return;const id=n.toLowerCase().replace(/[^a-z0-9]+/g,'-');if(!S.clubs.some(c=>c.id==id))S.clubs.push({id,name:n.trim()});ui.c=id;save()}
+else if(a=='addrow'){S.sched.push(['','New task','','all']);save()}
+else if(a=='delrow'){S.sched.splice(+v,1);save()}
+else if(a=='sortrows'){S.sched.sort((x,y)=>x[0].localeCompare(y[0]));save()}
+else if(a=='exp'){const l=document.createElement('a');l.href=URL.createObjectURL(new Blob([JSON.stringify(S,null,1)],{type:'application/json'}));l.download='club-dashboard-'+new Date().toISOString().slice(0,10)+'.json';l.click();return}
+render()});
+$('#month').addEventListener('change',e=>{if(e.target.value){ui.m=e.target.value;render()}});
+$('#imp').addEventListener('change',async e=>{try{const s=JSON.parse(await e.target.files[0].text());if(!s.clubs)throw 0;S=s;save();render()}catch{alert('That file is not a dashboard backup.')}});
+render();
+</script></body></html>
